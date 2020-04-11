@@ -59,21 +59,21 @@ Surface flux conditions, returned from `surface_conditions`.
 $(DocStringExtensions.FIELDS)
 """
 struct SurfaceFluxConditions{FT}
-  L_MO::FT
-  pottemp_flux_star::FT
-  flux::Vector{FT}
-  x_star::Vector{FT}
-  K_exchange::Vector{FT}
+    L_MO::FT
+    pottemp_flux_star::FT
+    flux::Vector{FT}
+    x_star::Vector{FT}
+    K_exchange::Vector{FT}
 end
 
 function Base.show(io::IO, sfc::SurfaceFluxConditions)
-  println(io, "----------------------- SurfaceFluxConditions")
-  println(io, "L_MO              = ", sfc.L_MO)
-  println(io, "pottemp_flux_star = ", sfc.pottemp_flux_star)
-  println(io, "flux              = ", sfc.flux)
-  println(io, "x_star            = ", sfc.x_star)
-  println(io, "K_exchange        = ", sfc.K_exchange)
-  println(io, "-----------------------")
+    println(io, "----------------------- SurfaceFluxConditions")
+    println(io, "L_MO              = ", sfc.L_MO)
+    println(io, "pottemp_flux_star = ", sfc.pottemp_flux_star)
+    println(io, "flux              = ", sfc.flux)
+    println(io, "x_star            = ", sfc.x_star)
+    println(io, "K_exchange        = ", sfc.K_exchange)
+    println(io, "-----------------------")
 end
 
 """
@@ -111,70 +111,76 @@ function surface_conditions(
     Δz::FT,
     z::FT,
     a::FT,
-    pottemp_flux_given::Union{Nothing,FT}=nothing
-    ) where {FT<:AbstractFloat, AbstractParameterSet}
+    pottemp_flux_given::Union{Nothing, FT} = nothing,
+) where {FT <: AbstractFloat, AbstractParameterSet}
 
-  n_vars = length(x_initial)-1
-  @assert length(x_initial)==n_vars+1
-  @assert length(x_ave)==n_vars
-  @assert length(x_s)==n_vars
-  @assert length(z_0)==n_vars
-  @assert length(F_exchange)==n_vars
-  @assert length(dimensionless_number)==n_vars
-  local sol
-  let param_set=param_set
-      function f!(F, x_all)
-          L_MO, x_vec = x_all[1], x_all[2:end]
-          u, θ = x_vec[1], x_vec[2]
-          pottemp_flux = pottemp_flux_given==nothing ? - u * θ : pottemp_flux_given
-          F[1] = L_MO - monin_obukhov_len(param_set, u, θ_bar, pottemp_flux)
-          for i in 1:n_vars
-            ϕ = x_vec[i]
-            transport = i==1 ? Momentum() : Heat()
-            F[i+1] = ϕ - compute_physical_scale(
-                param_set,
-                ϕ,
-                u,
-                Δz,
-                a,
-                θ_bar,
-                pottemp_flux,
-                z_0[i],
-                x_ave[i],
-                x_s[i],
-                dimensionless_number[i],
-                transport)
-          end
-      end
-      sol = nlsolve(f!, x_initial, autodiff = :forward)
-  end
-  if converged(sol)
-    L_MO, x_star = sol.zero[1], sol.zero[2:end]
-    u_star, θ_star = x_star[1], x_star[2]
-  else
-    @show sol
-    error("Unconverged surface fluxes")
-  end
+    n_vars = length(x_initial) - 1
+    @assert length(x_initial) == n_vars + 1
+    @assert length(x_ave) == n_vars
+    @assert length(x_s) == n_vars
+    @assert length(z_0) == n_vars
+    @assert length(F_exchange) == n_vars
+    @assert length(dimensionless_number) == n_vars
+    local sol
+    let param_set = param_set
+        function f!(F, x_all)
+            L_MO, x_vec = x_all[1], x_all[2:end]
+            u, θ = x_vec[1], x_vec[2]
+            pottemp_flux =
+                pottemp_flux_given == nothing ? -u * θ : pottemp_flux_given
+            F[1] = L_MO - monin_obukhov_len(param_set, u, θ_bar, pottemp_flux)
+            for i in 1:n_vars
+                ϕ = x_vec[i]
+                transport = i == 1 ? Momentum() : Heat()
+                F[i + 1] =
+                    ϕ - compute_physical_scale(
+                        param_set,
+                        ϕ,
+                        u,
+                        Δz,
+                        a,
+                        θ_bar,
+                        pottemp_flux,
+                        z_0[i],
+                        x_ave[i],
+                        x_s[i],
+                        dimensionless_number[i],
+                        transport,
+                    )
+            end
+        end
+        sol = nlsolve(f!, x_initial, autodiff = :forward)
+    end
+    if converged(sol)
+        L_MO, x_star = sol.zero[1], sol.zero[2:end]
+        u_star, θ_star = x_star[1], x_star[2]
+    else
+        @show sol
+        error("Unconverged surface fluxes")
+    end
 
-  _grav::FT = grav(param_set)
-  _von_karman_const::FT = von_karman_const(param_set)
-  pottemp_flux_star = -u_star^3*θ_bar/(_von_karman_const*_grav*L_MO)
-  flux = -u_star*x_star
-  K_exchange = compute_exchange_coefficients(
-    param_set,
-    z,
-    F_exchange,
-    a,
-    x_star,
-    θ_bar,
-    dimensionless_number,
-    L_MO)
+    _grav::FT = grav(param_set)
+    _von_karman_const::FT = von_karman_const(param_set)
+    pottemp_flux_star = -u_star^3 * θ_bar / (_von_karman_const * _grav * L_MO)
+    flux = -u_star * x_star
+    K_exchange = compute_exchange_coefficients(
+        param_set,
+        z,
+        F_exchange,
+        a,
+        x_star,
+        θ_bar,
+        dimensionless_number,
+        L_MO,
+    )
 
-  return SurfaceFluxConditions(L_MO,
-                               pottemp_flux_star,
-                               flux,
-                               x_star,
-                               K_exchange)
+    return SurfaceFluxConditions(
+        L_MO,
+        pottemp_flux_star,
+        flux,
+        x_star,
+        K_exchange,
+    )
 end
 
 
@@ -190,78 +196,66 @@ function compute_physical_scale(
     x_ave,
     x_s,
     dimensionless_number,
-    transport)
-  FT = typeof(u)
-  _von_karman_const::FT = von_karman_const(param_set)
-  L = monin_obukhov_len(param_set, u, θ_bar, pottemp_flux)
-  R_z0 = compute_R_z0(z_0, Δz)
-  temp1 = log(Δz/z_0)
-  temp2 = - compute_Psi(Δz/L, L, a, dimensionless_number, transport)
-  temp3 = z_0/Δz * compute_Psi(z_0/L, L, a, dimensionless_number, transport)
-  temp4 = R_z0 * (compute_psi(z_0/L, L, a, dimensionless_number, transport) - 1)
-  return (1/dimensionless_number)*_von_karman_const/(temp1+temp2+temp3+temp4)*(x_ave-x_s)
+    transport,
+)
+    FT = typeof(u)
+    _von_karman_const::FT = von_karman_const(param_set)
+    L = monin_obukhov_len(param_set, u, θ_bar, pottemp_flux)
+    R_z0 = compute_R_z0(z_0, Δz)
+    temp1 = log(Δz / z_0)
+    temp2 = -compute_Psi(Δz / L, L, a, dimensionless_number, transport)
+    temp3 =
+        z_0 / Δz * compute_Psi(z_0 / L, L, a, dimensionless_number, transport)
+    temp4 =
+        R_z0 * (compute_psi(z_0 / L, L, a, dimensionless_number, transport) - 1)
+    return (1 / dimensionless_number) * _von_karman_const /
+           (temp1 + temp2 + temp3 + temp4) * (x_ave - x_s)
 end
 
 """ Computes R_z0 expression, defined after Eq. 15 """
-compute_R_z0(z_0, Δz) = 1 - z_0/Δz
+compute_R_z0(z_0, Δz) = 1 - z_0 / Δz
 
 """ Computes f_m in Eq. A7 """
-compute_f_m(ζ) = sqrt(sqrt(1-15*ζ))
+compute_f_m(ζ) = sqrt(sqrt(1 - 15 * ζ))
 
 """ Computes f_h in Eq. A8 """
-compute_f_h(ζ) = sqrt(1-9*ζ)
+compute_f_h(ζ) = sqrt(1 - 9 * ζ)
 
 """ Computes psi_m in Eq. A3 """
-function compute_psi(
-    ζ,
-    L,
-    a,
-    dimensionless_number,
-    ::Momentum)
-  f_m = compute_f_m(ζ)
-  return L>=0 ? -a*ζ : log((1+f_m)^2*(1+f_m^2)/8) - 2*atan(f_m)+π/2
+function compute_psi(ζ, L, a, dimensionless_number, ::Momentum)
+    f_m = compute_f_m(ζ)
+    return L >= 0 ? -a * ζ :
+           log((1 + f_m)^2 * (1 + f_m^2) / 8) - 2 * atan(f_m) + π / 2
 end
 
 """ Computes psi_h in Eq. A4 """
-function compute_psi(
-    ζ,
-    L,
-    a,
-    dimensionless_number,
-    ::Heat)
-    L>=0 ? -a*ζ/dimensionless_number : 2*log((1+compute_f_h(ζ))/2)
+function compute_psi(ζ, L, a, dimensionless_number, ::Heat)
+    L >= 0 ? -a * ζ / dimensionless_number : 2 * log((1 + compute_f_h(ζ)) / 2)
 end
 
 """ Computes Psi_m in Eq. A5 """
-function compute_Psi(
-    ζ,
-    L,
-    a,
-    dimensionless_number,
-    ::Momentum)
-  if abs(ζ) < eps(typeof(L))
-    return ζ>=0 ? -a*ζ/2 : -15*ζ/8 # Computes Psi_m in Eq. A13
-  else
-    f_m = compute_f_m(ζ)
-    # Note that "1-f^3" in is a typo, it is supposed to be "1-f_m^3".
-    # This was confirmed by communication with the author.
-    return L>=0 ? -a*ζ/2 : log((1+f_m)^2*(1+f_m^2)/8) - 2*atan(f_m)+π/2-1+(1-f_m^3)/(12*ζ)
-  end
+function compute_Psi(ζ, L, a, dimensionless_number, ::Momentum)
+    if abs(ζ) < eps(typeof(L))
+        return ζ >= 0 ? -a * ζ / 2 : -15 * ζ / 8 # Computes Psi_m in Eq. A13
+    else
+        f_m = compute_f_m(ζ)
+        # Note that "1-f^3" in is a typo, it is supposed to be "1-f_m^3".
+        # This was confirmed by communication with the author.
+        return L >= 0 ? -a * ζ / 2 :
+               log((1 + f_m)^2 * (1 + f_m^2) / 8) - 2 * atan(f_m) + π / 2 - 1 +
+               (1 - f_m^3) / (12 * ζ)
+    end
 end
 
 """ Computes Psi_h in Eq. A6 """
-function compute_Psi(
-    ζ,
-    L,
-    a,
-    dimensionless_number,
-    ::Heat)
-  if abs(ζ) < eps(typeof(L))
-    return ζ>=0 ? -a*ζ/(2*dimensionless_number) : -9*ζ/4 # Computes Psi_h in Eq. A14
-  else
-    f_h = compute_f_h(ζ)
-    return L>=0 ? -a*ζ/(2*dimensionless_number) : 2*log((1+f_h)/2) + 2*(1-f_h)/(9*ζ)
-  end
+function compute_Psi(ζ, L, a, dimensionless_number, ::Heat)
+    if abs(ζ) < eps(typeof(L))
+        return ζ >= 0 ? -a * ζ / (2 * dimensionless_number) : -9 * ζ / 4 # Computes Psi_h in Eq. A14
+    else
+        f_h = compute_f_h(ζ)
+        return L >= 0 ? -a * ζ / (2 * dimensionless_number) :
+               2 * log((1 + f_h) / 2) + 2 * (1 - f_h) / (9 * ζ)
+    end
 end
 
 """
@@ -269,15 +263,11 @@ end
 
 Monin-Obukhov length. Eq. 3
 """
-function monin_obukhov_len(
-    param_set::AbstractParameterSet,
-    u,
-    θ_bar,
-    flux)
+function monin_obukhov_len(param_set::AbstractParameterSet, u, θ_bar, flux)
     FT = typeof(u)
     _grav::FT = grav(param_set)
     _von_karman_const::FT = von_karman_const(param_set)
-    return - u^3* θ_bar / (_von_karman_const * _grav * flux)
+    return -u^3 * θ_bar / (_von_karman_const * _grav * flux)
 end
 
 """
@@ -295,19 +285,21 @@ function compute_exchange_coefficients(
     x_star,
     θ_bar,
     dimensionless_number,
-    L_MO)
+    L_MO,
+)
 
-  N = length(F_exchange)
-  FT = typeof(z)
-  K_exchange = Vector{FT}(undef, N)
-  _von_karman_const::FT = von_karman_const(param_set)
-  for i in 1:N
-    transport = i==1 ? Momentum() : Heat()
-    psi = compute_psi(z/L_MO, L_MO, a, dimensionless_number[i], transport)
-    K_exchange[i] = -F_exchange[i]*_von_karman_const*z/(x_star[i] * psi) # Eq. 19 in
-  end
+    N = length(F_exchange)
+    FT = typeof(z)
+    K_exchange = Vector{FT}(undef, N)
+    _von_karman_const::FT = von_karman_const(param_set)
+    for i in 1:N
+        transport = i == 1 ? Momentum() : Heat()
+        psi = compute_psi(z / L_MO, L_MO, a, dimensionless_number[i], transport)
+        K_exchange[i] =
+            -F_exchange[i] * _von_karman_const * z / (x_star[i] * psi) # Eq. 19 in
+    end
 
-  return K_exchange
+    return K_exchange
 end
 
 end # SurfaceFluxes module

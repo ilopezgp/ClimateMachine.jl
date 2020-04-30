@@ -8,7 +8,9 @@ docs/build/
 docs/site/
 docs/src/tutorials/
 docs/src/generated/
+docs/**/Manifest.toml
 src/**/Manifest.toml
+env/**/Manifest.toml
 *.vtk
 *.dat
 *.vtu

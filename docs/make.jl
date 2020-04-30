@@ -1,5 +1,12 @@
 Base.HOME_PROJECT[] = abspath(Base.HOME_PROJECT[]) # JuliaLang/julia/pull/28625
 
+push!(LOAD_PATH, joinpath(@__DIR__, "..", "env", "Plots")) # add Plots env
+
+using Pkg
+Pkg.activate(@__DIR__)
+Pkg.instantiate(;verbose=true)
+Pkg.develop(PackageSpec(path=joinpath(@__DIR__, "..")))
+
 using CLIMA, Documenter, Literate
 
 generated_dir = joinpath(@__DIR__, "src", "generated") # generated files directory

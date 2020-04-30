@@ -5,6 +5,7 @@ export IndGenMinRes
 using ..LinearSolvers
 const LS = LinearSolvers
 using Adapt, KernelAbstractions, LinearAlgebra
+using CLIMA.MPIStateArrays
 
 # struct
 """
@@ -63,7 +64,7 @@ struct IndGenMinRes{FT, IT, VT, AT, TT1, TT2} <: LS.AbstractIterativeLinearSolve
 end
 
 # So that the struct can be passed into kernels
-Adapt.adapt_structure(to, x::IndGenMinRes) = IndGenMinRes(x.atol, x.rtol, x.m, x.n, x.k_n, adapt(to, x.residual), adapt(to, x.b), adapt(to, x.x),  adapt(to, x.sol), adapt(to, x.rhs), adapt(to, x.cs),  adapt(to, x.Q),  adapt(to, x.H), adapt(to, x.R), reshape_tuple_f, permute_tuple_f, reshape_tuple_b, permute_tuple_b)
+Adapt.adapt_structure(to, x::IndGenMinRes) = IndGenMinRes(x.atol, x.rtol, x.m, x.n, x.k_n, adapt(to, x.residual), adapt(to, x.b), adapt(to, x.x),  adapt(to, x.sol), adapt(to, x.rhs), adapt(to, x.cs),  adapt(to, x.Q),  adapt(to, x.H), adapt(to, x.R), x.reshape_tuple_f, x.permute_tuple_f, x.reshape_tuple_b, x.permute_tuple_b)
 
 """
 IndGenMinRes(Qrhs; m = length(Qrhs[:,1]), n = length(Qrhs[1,:]), subspace_size = m, atol = sqrt(eps(eltype(Qrhs))), rtol = sqrt(eps(eltype(Qrhs))), ArrayType = Array, reshape_tuple_f = size(Qrhs), permute_tuple_f = Tuple(1:length(size(Qrhs))), reshape_tuple_b = size(Qrhs), permute_tuple_b = Tuple(1:length(size(Qrhs))))
@@ -75,8 +76,8 @@ Generic constructor for IndGenMinRes
 - `Qrhs`: (array) Array structure that linear_operator! acts on
 
 # Keyword Arguments
-- `m`: (int) size of vector space for each independent linear solve. This is assumed to be the same for each and every linear solve. DEFAULT = length(Qrhs[:,1])
-- `n`: (int) number of independent linear solves, DEFAULT = length(Qrhs[1,:])
+- `m`: (int) size of vector space for each independent linear solve. This is assumed to be the same for each and every linear solve. DEFAULT = size(Qrhs)[1]
+- `n`: (int) number of independent linear solves, DEFAULT = size(Qrhs)[end]
 - `atol`: (float) absolute tolerance. DEFAULT = sqrt(eps(eltype(Qrhs)))
 - `rtol`: (float) relative tolerance. DEFAULT = sqrt(eps(eltype(Qrhs)))
 - `ArrayType`: (type). used for either using CuArrays or Arrays. DEFAULT = Array
@@ -88,7 +89,7 @@ Generic constructor for IndGenMinRes
 # Return
 instance of IndGenMinRes struct
 """
-function IndGenMinRes(Qrhs; m = length(Qrhs[:,1]), n = length(Qrhs[1,:]), subspace_size = m, atol = sqrt(eps(eltype(Qrhs))), rtol = sqrt(eps(eltype(Qrhs))), ArrayType = Array, reshape_tuple_f = size(Qrhs), permute_tuple_f = Tuple(1:length(size(Qrhs))), reshape_tuple_b = size(Qrhs), permute_tuple_b = Tuple(1:length(size(Qrhs))))
+function IndGenMinRes(Qrhs; m = size(Qrhs)[1], n = size(Qrhs)[end], subspace_size = m, atol = sqrt(eps(eltype(Qrhs))), rtol = sqrt(eps(eltype(Qrhs))), ArrayType = Array, reshape_tuple_f = size(Qrhs), permute_tuple_f = Tuple(1:length(size(Qrhs))), reshape_tuple_b = size(Qrhs), permute_tuple_b = Tuple(1:length(size(Qrhs))))
     k_n = subspace_size
     residual = ArrayType(zeros(eltype(Qrhs), (k_n, n)))
     b = ArrayType(zeros(eltype(Qrhs), (m, n)))
@@ -102,6 +103,9 @@ function IndGenMinRes(Qrhs; m = length(Qrhs[:,1]), n = length(Qrhs[1,:]), subspa
     return IndGenMinRes(atol, rtol, m, n, k_n, residual, b, x, sol, rhs, cs, Q, H, R, reshape_tuple_f, permute_tuple_f, reshape_tuple_b, permute_tuple_b)
 end
 
+# TODO test this with MPIStateArray or create seperate convenience constructor
+
+
 # initialize function (1)
 function LS.initialize!(linearoperator!, Q, Qrhs, solver::IndGenMinRes, args...)
     # body of initialize function in abstract iterative solver
@@ -113,14 +117,15 @@ function LS.doiteration!(linearoperator!, Q, Qrhs, gmres::IndGenMinRes, threshol
     # initialize gmres.x
     convert_structure!(gmres.x, Q, gmres.reshape_tuple_f, gmres.permute_tuple_f)
     # apply linear operator to construct residual
-    linearoperator!(Q, Qrhs, args...)
-    r_vector = Qrhs .- Q
+    r_vector = copy(Q)
+    linearoperator!(r_vector, Q, args...)
+    @. r_vector = Qrhs - r_vector
     # The following ar and rr are technically not correct in general cases
     ar = norm(r_vector)
     rr = norm(r_vector) / norm(Qrhs)
     # check if the initial guess is fantastic
     if (ar < gmres.atol) || (rr < gmres.rtol)
-        return true, 0, atol
+        return true, 0, ar
     end
     # initialize gmres.b
     convert_structure!(gmres.b, r_vector, gmres.reshape_tuple_f, gmres.permute_tuple_f)
@@ -129,36 +134,40 @@ function LS.doiteration!(linearoperator!, Q, Qrhs, gmres::IndGenMinRes, threshol
     # initialize gmres.sol
     convert_structure!(gmres.sol, Q, gmres.reshape_tuple_f, gmres.permute_tuple_f)
     # initialize the rest of gmres
+
     event = initialize_gmres!(gmres)
     wait(event)
     ar, rr = compute_residuals(gmres, 1)
     # check if converged
     if (ar < gmres.atol) || (rr < gmres.rtol)
-        event = construct_solution!(iterations, gmres)
+        event = construct_solution!(1, gmres)
         wait(event)
-        convert_structure!(x, gmres.x, reshape_tuple_b, permute_tuple_b)
-        return true, 1, atol
+        convert_structure!(Q, gmres.x, gmres.reshape_tuple_b, gmres.permute_tuple_b)
+        return true, 1, ar
     end
     # body of iteration
     @inbounds for i in 2:gmres.k_n
-        convert_structure!(r_vector, view(gmres.Q[:, i, :]), gmres.reshape_tuple_b, gmres.permute_tuple_b)
-        linear_operator!(Q, r_vector)
+        convert_structure!(r_vector, view(gmres.Q, :, i, :), gmres.reshape_tuple_b, gmres.permute_tuple_b)
+        linearoperator!(Q, r_vector, args...)
         convert_structure!(gmres.sol, Q, gmres.reshape_tuple_f, gmres.permute_tuple_f)
         event = gmres_update!(i, gmres)
         wait(event)
         ar, rr = compute_residuals(gmres, i)
         # check if converged
         if (ar < gmres.atol) || (rr < gmres.rtol)
-            event = construct_solution!(iterations, gmres)
+            event = construct_solution!(i, gmres)
             wait(event)
-            convert_structure!(x, gmres.x, reshape_tuple_b, permute_tuple_b)
-            return true, i, atol
+            convert_structure!(Q, gmres.x, gmres.reshape_tuple_b, gmres.permute_tuple_b)
+            return true, i, ar
         end
     end
-    event = construct_solution!(iterations, gmres)
+
+    event = construct_solution!(gmres.k_n, gmres)
     wait(event)
-    convert_structure!(x, gmres.x, reshape_tuple_b, permute_tuple_b)
-    return Bool, Int, Float
+    convert_structure!(Q, gmres.x, gmres.reshape_tuple_b, gmres.permute_tuple_b)
+    ar, rr = compute_residuals(gmres, gmres.k_n)
+    converged = (ar < gmres.atol) || (rr < gmres.rtol)
+    return converged, gmres.k_n, ar
 end
 
 # The function(s) that probably needs the most help
@@ -192,6 +201,10 @@ A naive kernel version of this operation is too slow
     end
     return nothing
 end
+
+# TODO test these with MPIStateArray
+@inline convert_structure!(x, y::MPIStateArray, reshape_tuple, permute_tuple) = convert_structure!(x, y.data, reshape_tuple, permute_tuple)
+@inline convert_structure!(x::MPIStateArray, y, reshape_tuple, permute_tuple) = convert_structure!(x.data, y, reshape_tuple, permute_tuple)
 
 # Kernels
 """
@@ -514,7 +527,7 @@ nothing
 """
 @inline function solve_optimization!(n, gmres, I)
     # just need to update rhs from previous iteration
-    # apply latest gibbs rotation
+    # apply latest givens rotation
     tmp1 = gmres.cs[1 + 2*(n-1), I] * gmres.rhs[n, I] - gmres.cs[2*n, I] * gmres.rhs[n+1, I]
     gmres.rhs[n+1, I] = gmres.cs[2*n, I] * gmres.rhs[n, I] + gmres.cs[1 + 2*(n-1), I] * gmres.rhs[n+1, I]
     gmres.rhs[n, I] = tmp1
@@ -547,10 +560,13 @@ Compute atol and rtol of current iteration
 # Return
 - `atol`: (float) absolute tolerance
 - `rtol`: (float) relative tolerance
+
+# Comment
+sometimes gmres.R[1, 1,:] term has some very large components which makes rtol quite small
 """
 function compute_residuals(gmres, i)
-    atol = maximum(gmres.residual[i])
-    rtol = maximum(gmres.residual[i] ./ norm(gmres.R[:, 1]))
+    atol = maximum(gmres.residual[i,:])
+    rtol = maximum(gmres.residual[i,:] ./ norm(gmres.R[1,1,:]))
     return atol, rtol
 end
 

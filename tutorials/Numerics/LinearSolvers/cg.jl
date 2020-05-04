@@ -12,7 +12,7 @@
 # ```
 # via iterative methods.
 # !!! warning
-#     The linear operator need to be symmetric positive definite and the preconditioner must be symmetric.
+#     The linear operator needs to be symmetric positive definite and the preconditioner must be symmetric.
 # See the [wikipedia](https://en.wikipedia.org/wiki/Conjugate_gradient_method) for more details.
 
 # ## Basic Example

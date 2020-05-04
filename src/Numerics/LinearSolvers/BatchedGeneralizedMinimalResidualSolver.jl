@@ -26,9 +26,9 @@ Launches n independent GMRES solves
 - sol::VT (vector) solution vector, it is used twice. First to represent Aqⁿ (the latest Krylov vector without being normalized), the second to represent the solution to the linear system
 - rhs::VT (vector) rhs vector.
 - cs::VT (vector) Sequence of Gibbs Rotation matrices in compact form. This is implicitly the Qᵀ of the QR factorization of the upper hessenberg matrix H.
-- H::AT (array) Upper Hessenberg Matrix. A factor of two in memory can be saved here.
+- H::AT (array) Upper Hessenberg Matrix. A factor of k_n or so in memory can be saved here.
 - Q::AT (array) Orthonormalized Krylov Subspace
-- R::AT (array) The R of the QR factorization of the UpperHessenberg matrix H. A factor of 2 or so in memory can be saved here
+- R::AT (array) The R of the QR factorization of the UpperHessenberg matrix H. A factor of  or so in memory can be saved here
 - reshape_tuple_f::TT1 (tuple), reshapes structure of array that plays nice with the linear operator to a format compatible with struct
 - permute_tuple_f::TT1 (tuple). forward permute tuple. permutes structure of array that plays nice with the linear operator to a format compatible with struct
 - reshape_tuple_b::TT2 (tuple). reshapes structure of array that plays nice with struct to play nice with the linear operator
@@ -38,7 +38,6 @@ Launches n independent GMRES solves
 Solving n linear systems iteratively
 
 # Comments on Improvement
-- Allocates all the memory at once: Could improve to something more dynamic
 - Too much memory in H and R struct: Could use a sparse representation to cut memory use in half (or more)
 - Needs to perform a transpose of original data structure into current data structure: Could perhaps do a transpose free version, but the code gets a bit clunkier and the memory would no longer be coalesced for the heavy operations
 """

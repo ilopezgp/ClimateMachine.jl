@@ -9,6 +9,7 @@ include("iterativesolvers.jl")
         (1, "poisson.jl"),
         (1, "bandedsystem.jl"),
         (1, "cg.jl"),
+        (1, "bgmres.jl"),
     ]
     runmpi(tests, @__FILE__)
 end

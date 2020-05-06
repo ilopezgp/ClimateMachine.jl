@@ -1,6 +1,7 @@
 using Test
 using CLIMA.MoistThermodynamics
 using NCDatasets
+using RootSolvers
 using Random
 MT = MoistThermodynamics
 using LinearAlgebra
@@ -249,7 +250,7 @@ end
         ρ,
         q_tot,
         10,
-        1e-2,
+        SolutionTolerance(1e-2),
     ) ≈ 300.0
     @test abs(
         MT.saturation_adjustment(
@@ -258,7 +259,7 @@ end
             ρ,
             q_tot,
             10,
-            1e-2,
+            SolutionTolerance(1e-2),
         ) - 300.0,
     ) < tol_T
 
@@ -270,7 +271,7 @@ end
         ρ,
         q_tot,
         10,
-        1e-2,
+        SolutionTolerance(1e-2),
     ) ≈ 200.0
     @test abs(
         MT.saturation_adjustment(
@@ -279,7 +280,7 @@ end
             ρ,
             q_tot,
             10,
-            1e-2,
+            SolutionTolerance(1e-2),
         ) - 200.0,
     ) < tol_T
     q = PhasePartition_equil(param_set, T, ρ, q_tot)
@@ -374,7 +375,7 @@ end
                 e_int,
                 ρ,
                 q_tot,
-                30,
+                40,
                 FT(1e-1),
                 MT.saturation_adjustment_SecantMethod,
             ) # Needs to be in sync with default
@@ -404,8 +405,8 @@ end
                 θ_liq_ice,
                 ρ,
                 q_tot,
-                40,
-                FT(1e-3),
+                100,
+                FT(1e-6),
             )
         ts = LiquidIcePotTempSHumEquil.(Ref(param_set), θ_liq_ice, ρ, q_tot)
         # Should be machine accurate:
@@ -549,7 +550,7 @@ end
                 e_int,
                 ρ,
                 q_tot,
-                30,
+                40,
                 FT(1e-1),
                 Ref(MT.saturation_adjustment_SecantMethod),
             )
@@ -608,7 +609,7 @@ end
                 θ_liq_ice,
                 ρ,
                 10,
-                FT(1e-3),
+                SolutionTolerance(FT(1e-3)),
                 q_pt,
             )
         T_expansion =
@@ -632,7 +633,7 @@ end
                 ρ,
                 q_tot,
                 40,
-                FT(1e-3),
+                FT(1e-4),
             )
         @test all(isapprox.(liquid_ice_pottemp.(ts), θ_liq_ice, atol = 1e-1))
         @test all(isapprox.(air_density.(ts), ρ, rtol = rtol))
@@ -651,7 +652,7 @@ end
                 p,
                 q_tot,
                 40,
-                FT(1e-3),
+                FT(1e-4),
             )
         @test all(isapprox.(liquid_ice_pottemp.(ts), θ_liq_ice, atol = 1e-1))
         @test all(
@@ -689,7 +690,7 @@ end
                 5,
                 FT(1e-3),
             )
-        @test all(θ_liq_ice .≈ liquid_ice_pottemp.(ts))
+        @test all(isapprox.(θ_liq_ice, liquid_ice_pottemp.(ts), rtol=rtol))
         @test all(air_density.(ts) .≈ ρ)
         @test all(
             getproperty.(PhasePartition.(ts), :tot) .≈ getproperty.(q_pt, :tot),

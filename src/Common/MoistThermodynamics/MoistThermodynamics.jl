@@ -28,6 +28,7 @@ module MoistThermodynamics
 using DocStringExtensions
 
 using RootSolvers
+const AbstractTolerance = RootSolvers.AbstractTolerance
 
 # Atmospheric equation of state
 export air_pressure,
@@ -965,7 +966,9 @@ Compute the temperature that is consistent with
  - `e_int` internal energy
  - `ρ` (moist-)air density
  - `q_tot` total specific humidity
- - `tol` tolerance for non-linear equation solve
+ - `tol` absolute tolerance for saturation adjustment iterations. Can be one of:
+    - `SolutionTolerance()` to stop when ``|x_2 - x_1| < tol``
+    - `ResidualTolerance()` to stop when ``|f(x)| < tol``
  - `maxiter` maximum iterations for non-linear equation solve
 
 by finding the root of
@@ -982,7 +985,7 @@ function saturation_adjustment(
     ρ::FT,
     q_tot::FT,
     maxiter::Int,
-    tol::FT,
+    tol::AbstractTolerance,
 ) where {FT <: Real}
     _T_min::FT = T_min(param_set)
 
@@ -996,7 +999,7 @@ function saturation_adjustment(
             T -> internal_energy_sat(param_set, T, ρ, q_tot) - e_int,
             NewtonsMethod(T_1, T_ -> ∂e_int_∂T(param_set, T_, e_int, ρ, q_tot)),
             CompactSolution(),
-            SolutionTolerance(tol),
+            tol,
             maxiter,
         )
         if !sol.converged
@@ -1040,7 +1043,9 @@ Compute the temperature `T` that is consistent with
  - `e_int` internal energy
  - `ρ` (moist-)air density
  - `q_tot` total specific humidity
- - `tol` tolerance for non-linear equation solve
+ - `tol` absolute tolerance for saturation adjustment iterations. Can be one of:
+    - `SolutionTolerance()` to stop when ``|x_2 - x_1| < tol``
+    - `ResidualTolerance()` to stop when ``|f(x)| < tol``
  - `maxiter` maximum iterations for non-linear equation solve
 
 by finding the root of
@@ -1055,7 +1060,7 @@ function saturation_adjustment_SecantMethod(
     ρ::FT,
     q_tot::FT,
     maxiter::Int,
-    tol::FT,
+    tol::AbstractTolerance,
 ) where {FT <: Real}
     _T_min::FT = T_min(param_set)
     T_1 = max(_T_min, air_temperature(param_set, e_int, PhasePartition(q_tot))) # Assume all vapor
@@ -1075,7 +1080,7 @@ function saturation_adjustment_SecantMethod(
             T -> internal_energy_sat(param_set, T, ρ, q_tot) - e_int,
             SecantMethod(T_1, T_2),
             CompactSolution(),
-            SolutionTolerance(tol),
+            tol,
             maxiter,
         )
         if !sol.converged
@@ -1094,7 +1099,9 @@ Compute the temperature `T` that is consistent with
  - `θ_liq_ice` liquid-ice potential temperature
  - `q_tot` total specific humidity
  - `ρ` (moist-)air density
- - `tol` tolerance for non-linear equation solve
+ - `tol` absolute tolerance saturation adjustment iterations. Can be one of:
+    - `SolutionTolerance()` to stop when ``|x_2 - x_1| < tol``
+    - `ResidualTolerance()` to stop when ``|f(x)| < tol``
  - `maxiter` maximum iterations for non-linear equation solve
 
 by finding the root of
@@ -1111,7 +1118,7 @@ function saturation_adjustment_q_tot_θ_liq_ice(
     ρ::FT,
     q_tot::FT,
     maxiter::Int,
-    tol::FT,
+    tol::AbstractTolerance,
 ) where {FT <: Real}
     _T_min::FT = T_min(param_set)
     T_1 = max(
@@ -1139,7 +1146,7 @@ function saturation_adjustment_q_tot_θ_liq_ice(
             T -> liquid_ice_pottemp_sat(param_set, T, ρ, q_tot) - θ_liq_ice,
             SecantMethod(T_1, T_2),
             CompactSolution(),
-            SolutionTolerance(tol),
+            tol,
             maxiter,
         )
         if !sol.converged
@@ -1158,7 +1165,9 @@ Compute the temperature `T` that is consistent with
  - `θ_liq_ice` liquid-ice potential temperature
  - `q_tot` total specific humidity
  - `p` pressure
- - `tol` tolerance for non-linear equation solve
+ - `tol` absolute tolerance saturation adjustment iterations. Can be one of:
+    - `SolutionTolerance()` to stop when ``|x_2 - x_1| < tol``
+    - `ResidualTolerance()` to stop when ``|f(x)| < tol``
  - `maxiter` maximum iterations for non-linear equation solve
 
 by finding the root of
@@ -1175,7 +1184,7 @@ function saturation_adjustment_q_tot_θ_liq_ice_given_pressure(
     p::FT,
     q_tot::FT,
     maxiter::Int,
-    tol::FT,
+    tol::AbstractTolerance,
 ) where {FT <: Real}
     _T_min::FT = T_min(param_set)
     T_1 = air_temperature_from_liquid_ice_pottemp_given_pressure(
@@ -1207,7 +1216,7 @@ function saturation_adjustment_q_tot_θ_liq_ice_given_pressure(
                 ) - θ_liq_ice,
             SecantMethod(T_1, T_2),
             CompactSolution(),
-            SolutionTolerance(tol),
+            tol,
             maxiter,
         )
         if !sol.converged
@@ -1383,7 +1392,9 @@ Computes temperature `T` given
  - `param_set` an `AbstractParameterSet`, see the [`MoistThermodynamics`](@ref) for more details
  - `θ_liq_ice` liquid-ice potential temperature
  - `ρ` (moist-)air density
- - `tol` tolerance for non-linear equation solve
+ - `tol` absolute tolerance non-linear equation iterations. Can be one of:
+    - `SolutionTolerance()` to stop when ``|x_2 - x_1| < tol``
+    - `ResidualTolerance()` to stop when ``|f(x)| < tol``
  - `maxiter` maximum iterations for non-linear equation solve
 and, optionally,
  - `q` [`PhasePartition`](@ref). Without this argument, the results are for dry air,
@@ -1398,7 +1409,7 @@ function air_temperature_from_liquid_ice_pottemp_non_linear(
     θ_liq_ice::FT,
     ρ::FT,
     maxiter::Int,
-    tol::FT,
+    tol::AbstractTolerance,
     q::PhasePartition{FT} = q_pt_0(FT),
 ) where {FT <: Real}
     _T_min::FT = T_min(param_set)
@@ -1413,7 +1424,7 @@ function air_temperature_from_liquid_ice_pottemp_non_linear(
             ),
         SecantMethod(_T_min, _T_max),
         CompactSolution(),
-        SolutionTolerance(tol),
+        tol,
         maxiter,
     )
     if !sol.converged

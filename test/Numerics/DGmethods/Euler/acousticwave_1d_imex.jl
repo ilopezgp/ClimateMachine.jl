@@ -11,8 +11,7 @@ using ClimateMachine.DGmethods.NumericalFluxes:
     CentralNumericalFluxGradient,
     CentralNumericalFluxSecondOrder
 using ClimateMachine.ODESolvers
-using ClimateMachine.GeneralizedMinimalResidualSolver
-using ClimateMachine.ColumnwiseLUSolver: ManyColumnLU
+using ClimateMachine.BatchedGeneralizedMinimalResidualSolver: BatchedGeneralizedMinimalResidual
 using ClimateMachine.VTK: writevtk, writepvtu
 using ClimateMachine.GenericCallbacks:
     EveryXWallTimeSeconds, EveryXSimulationSteps
@@ -153,12 +152,34 @@ function run(
 
     Q = init_ode_state(dg, FT(0))
 
-    linearsolver = ManyColumnLU()
+    # Setup columnwise GMRES solver (Batched GMRES)
+    ngl = polynomialorder + 1
+    num_states = size(Q)[2]
+    nelem = length(topology.elems)
+    nvertelem = topology.stacksize
+    nhorzelem = div(nelem, nvertelem)
+
+    reshaping_tup = (ngl, ngl, ngl, num_states, nvertelem, nhorzelem)
+    m = reshaping_tup[3] * reshaping_tup[5]
+    n = reshaping_tup[1]*reshaping_tup[2]*reshaping_tup[4]*reshaping_tup[6]
+
+    linearsolver = BatchedGeneralizedMinimalResidual(
+        Q;
+        ArrayType = ArrayType,
+        m = m,
+        n = n,
+        reshape_tuple_f = reshaping_tup,
+        # Permute such that the first two indices are associated with
+        # traversing a single column (3 and 5)
+        permute_tuple_f = (3,5,1,4,2,6),
+        atol = 1e-10,
+        rtol = 1e-10,
+    )
 
     odesolver = ARK2GiraldoKellyConstantinescu(
         dg,
         lineardg,
-        LinearBackwardEulerSolver(linearsolver; isadjustable = false),
+        LinearBackwardEulerSolver(linearsolver; isadjustable = true),
         Q;
         dt = dt,
         t0 = 0,

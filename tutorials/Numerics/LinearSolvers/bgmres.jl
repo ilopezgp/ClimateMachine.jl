@@ -154,7 +154,7 @@ reshape_tuple_f = tup
 # and we want to make sure that these are the first set of indices that appear
 # in the permutatation tuple (which can be thought of as enacting
 # a Tensor Transpose).
-permute_tuple_f = (3,5,1,4,2,6) # make the column indices the fast indices
+permute_tuple_f = (5,3,1,6,4,2) # make the column indices the fast indices
 # It has this format since the 3 and 5 index slots
 # are the ones associated with traversing a column.
 # We also need to tell our solver whether or not it is performing a GPU

@@ -89,7 +89,8 @@ instance of BatchedGeneralizedMinimalResidual struct
 function BatchedGeneralizedMinimalResidual(Qrhs; m = size(Qrhs)[1], n = size(Qrhs)[end], subspace_size = m, atol = sqrt(eps(eltype(Qrhs))), rtol = sqrt(eps(eltype(Qrhs))), ArrayType = Array, reshape_tuple_f = size(Qrhs), permute_tuple_f = Tuple(1:length(size(Qrhs))))
     k_n = subspace_size
     # define the back permutations and reshapes
-    permute_tuple_b = permute_tuple_f
+    # permute_tuple_b = permute_tuple_f
+    permute_tuple_b = Tuple(sortperm([permute_tuple_f...]))
     tmp_reshape_tuple_b = [reshape_tuple_f...]
     permute!(tmp_reshape_tuple_b, [permute_tuple_f...])
     reshape_tuple_b = Tuple(tmp_reshape_tuple_b)

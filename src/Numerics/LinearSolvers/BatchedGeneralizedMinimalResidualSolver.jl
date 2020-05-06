@@ -26,7 +26,7 @@ Launches n independent GMRES solves
 - sol::VT (vector) solution vector, it is used twice. First to represent Aqⁿ (the latest Krylov vector without being normalized), the second to represent the solution to the linear system
 - rhs::VT (vector) rhs vector.
 - cs::VT (vector) Sequence of Gibbs Rotation matrices in compact form. This is implicitly the Qᵀ of the QR factorization of the upper hessenberg matrix H.
-- H::AT (array) Upper Hessenberg Matrix. A factor of k_n or so in memory can be saved here.
+- H::VT (vector) The latest column of the Upper Hessenberg Matrix. The previous columns are discarded since they are unnecessary
 - Q::AT (array) Orthonormalized Krylov Subspace
 - R::AT (array) The R of the QR factorization of the UpperHessenberg matrix H. A factor of  or so in memory can be saved here
 - reshape_tuple_f::TT1 (tuple), reshapes structure of array that plays nice with the linear operator to a format compatible with struct
@@ -54,7 +54,7 @@ struct BatchedGeneralizedMinimalResidual{FT, IT, VT, AT, TT1, TT2} <: LS.Abstrac
     rhs::VT
     cs::VT
     Q::AT
-    H::AT
+    H::VT
     R::AT
     reshape_tuple_f::TT1
     permute_tuple_f::TT1
@@ -89,7 +89,6 @@ instance of BatchedGeneralizedMinimalResidual struct
 function BatchedGeneralizedMinimalResidual(Qrhs; m = size(Qrhs)[1], n = size(Qrhs)[end], subspace_size = m, atol = sqrt(eps(eltype(Qrhs))), rtol = sqrt(eps(eltype(Qrhs))), ArrayType = Array, reshape_tuple_f = size(Qrhs), permute_tuple_f = Tuple(1:length(size(Qrhs))))
     k_n = subspace_size
     # define the back permutations and reshapes
-    # permute_tuple_b = permute_tuple_f
     permute_tuple_b = Tuple(sortperm([permute_tuple_f...]))
     tmp_reshape_tuple_b = [reshape_tuple_f...]
     permute!(tmp_reshape_tuple_b, [permute_tuple_f...])
@@ -102,13 +101,12 @@ function BatchedGeneralizedMinimalResidual(Qrhs; m = size(Qrhs)[1], n = size(Qrh
     rhs = ArrayType(zeros(eltype(Qrhs), (k_n + 1, n)))
     cs = ArrayType(zeros(eltype(Qrhs), (2 * k_n, n)))
     Q = ArrayType(zeros(eltype(Qrhs), (m, k_n+1 , n)))
-    H = ArrayType(zeros(eltype(Qrhs), (k_n+1, k_n, n)))
+    H = ArrayType(zeros(eltype(Qrhs), (k_n+1, n)))
     R  = ArrayType(zeros(eltype(Qrhs), (k_n+1, k_n, n)))
     return BatchedGeneralizedMinimalResidual(atol, rtol, m, n, k_n, residual, b, x, sol, rhs, cs, Q, H, R, reshape_tuple_f, permute_tuple_f, reshape_tuple_b, permute_tuple_b)
 end
 
-# TODO test this with MPIStateArray or create seperate convenience constructor
-
+# TODO create seperate convenience constructor
 
 # initialize function (1)
 function LS.initialize!(linearoperator!, Q, Qrhs, solver::BatchedGeneralizedMinimalResidual, args...)
@@ -138,7 +136,6 @@ function LS.doiteration!(linearoperator!, Q, Qrhs, gmres::BatchedGeneralizedMini
     # initialize gmres.sol
     convert_structure!(gmres.sol, Q, gmres.reshape_tuple_f, gmres.permute_tuple_f)
     # initialize the rest of gmres
-
     event = initialize_gmres!(gmres)
     wait(event)
     ar, rr = compute_residuals(gmres, 1)
@@ -392,9 +389,9 @@ nothing
 
     @inbounds for i in 1:(gmres.k_n + 1)
         gmres.rhs[i, I] = ft_zero
+        gmres.H[i,I] = ft_zero
         @inbounds for j in 1:gmres.k_n
             gmres.R[i,j,I] = ft_zero
-            gmres.H[i,j,I] = ft_zero
         end
     end
     # gmres.x was initialized as the initial x
@@ -427,8 +424,8 @@ initializes the QR decomposition of the UpperHesenberg Matrix
 nothing
 """
 @inline function initialize_QR!(gmres, I)
-    gmres.cs[1, I] = gmres.H[1,1, I]
-    gmres.cs[2, I] = gmres.H[2,1, I]
+    gmres.cs[1, I] = gmres.H[1, I]
+    gmres.cs[2, I] = gmres.H[2, I]
     gmres.R[1, 1, I] = sqrt(gmres.cs[1, I]^2 + gmres.cs[2, I]^2)
     gmres.cs[1, I] /= gmres.R[1,1, I]
     gmres.cs[2, I] /= -gmres.R[1,1, I]
@@ -460,23 +457,23 @@ nothing
 @inline function update_arnoldi!(n, gmres, I)
     # make new Krylov Vector orthogonal to previous ones
     @inbounds for j in 1:n
-        gmres.H[j, n, I] = 0
+        gmres.H[j, I] = 0
         # dot products
         @inbounds for i in 1:gmres.m
-            gmres.H[j, n, I] += gmres.Q[i, j, I] * gmres.sol[i, I]
+            gmres.H[j, I] += gmres.Q[i, j, I] * gmres.sol[i, I]
         end
         # orthogonalize latest Krylov Vector
         @inbounds for i in 1:gmres.m
-            gmres.sol[i, I] -= gmres.H[j, n, I] * gmres.Q[i,j, I]
+            gmres.sol[i, I] -= gmres.H[j, I] * gmres.Q[i,j, I]
         end
     end
     norm_q = 0.0
     @inbounds for i in 1:gmres.m
         norm_q += gmres.sol[i,I] * gmres.sol[i,I]
     end
-    gmres.H[n+1, n, I] = sqrt(norm_q)
+    gmres.H[n+1, I] = sqrt(norm_q)
     @inbounds for i in 1:gmres.m
-        gmres.Q[i, n+1, I] = gmres.sol[i, I] / gmres.H[n+1, n, I]
+        gmres.Q[i, n+1, I] = gmres.sol[i, I] / gmres.H[n+1, I]
     end
     return nothing
 end
@@ -499,7 +496,7 @@ What is actually produced by the algorithm isn't the Q in the QR decomposition b
 @inline function update_QR!(n, gmres, I)
     # Apply previous Q to new column
     @inbounds for i in 1:n
-        gmres.R[i, n, I] = gmres.H[i, n, I]
+        gmres.R[i, n, I] = gmres.H[i, I]
     end
     # apply rotation
     @inbounds for i in 1:n-1
@@ -509,7 +506,7 @@ What is actually produced by the algorithm isn't the Q in the QR decomposition b
     end
     # Now update, cs and R
     gmres.cs[1+2*(n-1), I] = gmres.R[n, n, I]
-    gmres.cs[2*n, I] = gmres.H[n+1,n, I]
+    gmres.cs[2*n, I] = gmres.H[n+1, I]
     gmres.R[n, n, I] = sqrt(gmres.cs[1+2*(n-1), I]^2 + gmres.cs[2*n, I]^2)
     gmres.cs[1+2*(n-1), I] /= gmres.R[n, n, I]
     gmres.cs[2*n, I] /= -gmres.R[n, n, I]

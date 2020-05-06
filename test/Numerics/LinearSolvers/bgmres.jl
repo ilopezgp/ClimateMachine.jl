@@ -229,7 +229,7 @@ columnwise_inverse_linear_operator!(x, b)
 x += randn((tup[1] * tup[2] * tup[3], tup[4], tup[5] * tup[6])) * 0.1
 
 reshape_tuple_f = tup
-permute_tuple_f = (3,5,1,4,2,6)
+permute_tuple_f = (5,3,1,4,2,6)
 
 gmres = BatchedGeneralizedMinimalResidual(b, m = tup[3]*tup[5], n = tup[1]*tup[2]*tup[4]*tup[6], reshape_tuple_f = reshape_tuple_f, permute_tuple_f = permute_tuple_f, atol = eps(T), rtol = eps(T))
 

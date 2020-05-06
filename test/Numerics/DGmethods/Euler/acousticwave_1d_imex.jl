@@ -55,7 +55,7 @@ function main()
 
     mpicomm = MPI.COMM_WORLD
 
-    polynomialorder = 5
+    polynomialorder = 1
     numelem_horz = 10
     numelem_vert = 5
 
@@ -161,7 +161,7 @@ function run(
 
     reshaping_tup = (ngl, ngl, ngl, num_states, nvertelem, nhorzelem)
     m = reshaping_tup[3] * reshaping_tup[5]
-    n = reshaping_tup[1]*reshaping_tup[2]*reshaping_tup[4]*reshaping_tup[6]
+    n = reshaping_tup[1] * reshaping_tup[2] * reshaping_tup[4] * reshaping_tup[6]
 
     linearsolver = BatchedGeneralizedMinimalResidual(
         Q;
@@ -171,9 +171,9 @@ function run(
         reshape_tuple_f = reshaping_tup,
         # Permute such that the first two indices are associated with
         # traversing a single column (3 and 5)
-        permute_tuple_f = (3,5,1,4,2,6),
-        atol = 1e-10,
-        rtol = 1e-10,
+        permute_tuple_f = (3,5,4,2,1,6),
+        atol = sqrt(eps(FT)) * 0.01,
+        rtol = sqrt(eps(FT)) * 0.01,
     )
 
     odesolver = ARK2GiraldoKellyConstantinescu(

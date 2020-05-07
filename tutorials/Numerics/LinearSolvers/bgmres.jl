@@ -141,8 +141,8 @@ mpi_tup = (tup[1] * tup[2] * tup[3], tup[4], tup[5] * tup[6]);
 # We now define the right hand side of our Linear system
 b = randn(mpi_tup);
 # As well as the initial guess
-x = copy(b)
-x += randn(mpi_tup) * 0.1
+x = copy(b);
+x += randn(mpi_tup) * 0.1;
 # In the previous tutorial we mentioned that it is assumed that
 # the right hand side is an array whose column vectors all independent linear
 # systems. But right now the array structure of ``x`` and ``b`` do not follow
@@ -151,29 +151,29 @@ x += randn(mpi_tup) * 0.1
 # linear solver how to reconcile these differences.
 # The first thing that the linear solver must know of is the higher tensor
 # form of the MPIStateArray, which is just the `tup` from before
-reshape_tuple_f = tup
+reshape_tuple_f = tup;
 # The second thing it needs to know is which indices correspond to a column
 # and we want to make sure that these are the first set of indices that appear
-# in the permutatation tuple (which can be thought of as enacting
+# in the permutation tuple (which can be thought of as enacting
 # a Tensor Transpose).
-permute_tuple_f = (5, 3, 4, 6, 1, 2) # make the column indices the fast indices
+permute_tuple_f = (5, 3, 4, 6, 1, 2);
 # It has this format since the 3 and 5 index slots
 # are the ones associated with traversing a column. And the 4 index
 # slot corresponds to a state.
 # We also need to tell our solver which kind of Array struct to use
-ArrayType = Array
+ArrayType = Array;
 
 # We are now ready to finally define our linear solver, which uses a number
 # of keyword arguments
-gmres = BatchedGeneralizedMinimalResidual(b, ArrayType = ArrayType, m = tup[3]*tup[5]*tup[4], n = tup[1]*tup[2]*tup[6], reshape_tuple_f = reshape_tuple_f, permute_tuple_f = permute_tuple_f, atol = eps(Float64)*10^2, rtol = eps(Float64)*10^2)
+mres = BatchedGeneralizedMinimalResidual(b, ArrayType = ArrayType, m = tup[3]*tup[5]*tup[4], n = tup[1]*tup[2]*tup[6], reshape_tuple_f = reshape_tuple_f, permute_tuple_f = permute_tuple_f, atol = eps(Float64)*10^2, rtol = eps(Float64)*10^2);
 # ```m``` is the number of gridpoints along a column. As mentioned previously,
-# this is tup[3]*tup[5]*tup[4]. The ```n``` term corresponds to the batch size
+# this is `tup[3]*tup[5]*tup[4]`. The ```n``` term corresponds to the batch size
 # or the number of columns in this case. ```atol``` and ```rtol``` are relative and
 # absolute tolerances
 
 # All the hard work is done, now we just call our linear solver
 iters = linearsolve!(columnwise_linear_operator!, gmres, x, b, max_iters = tup[3]*tup[5]*tup[4])
-# We see that it converged in less than tup[3]*tup[5] = 50 iterations.
+# We see that it converged in less than `tup[3]*tup[5] = 50` iterations.
 # Let us verify that it is indeed correct by computing the exact answer
 # numerically and comparing it against the iterative solver.
 x_exact = copy(x);

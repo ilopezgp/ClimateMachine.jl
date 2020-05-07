@@ -2,7 +2,7 @@
 # In this tutorial we describe the basics of using the batched gmres iterative solver
 # At the end you should be able to
 # 1. Use BatchedGeneralizedMinimalResidual to solve batches of linear systems
-# 2. Contruct a columnwise linear solver with BatchedGeneralizedMinimalResidual
+# 2. Construct a columnwise linear solver with BatchedGeneralizedMinimalResidual
 
 # ## What is the Generalized Minimal Residual Method?
 # The  Generalized Minimal Residual Method (GMRES) is a [Krylov subspace](https://en.wikipedia.org/wiki/Krylov_subspace) method for solving linear systems:
@@ -61,29 +61,29 @@ y = [y1 y2];
 x = copy(y);
 linear_operator!(x,y);
 display(x)
-# We see that the first column is A1 * [1 1 1]'
-# and the second column is A2 * [2 2 2]'
+# We see that the first column is `A1 * [1 1 1]'`
+# and the second column is `A2 * [2 2 2]'`
 # that is,
 display([A1*y1 A2*y2])
 
 # We are now ready to set up our Batched Generalized Minimal Residual solver
 # Since we have just set up our linear operator we must now set up the
 # right hand side of the linear system
-b = [b1 b2]
+b = [b1 b2];
 # as well as the exact solution, (to verify that the method does indeed converge)
-x_exact = [x1_exact x2_exact]
+x_exact = [x1_exact x2_exact];
 # !!! Warning
 #     For BatchedGeneralizedMinimalResidual the assumption is that each column of b is independent and corresponds to a batch. This will come back later.
 
 # We now use the great an instance of the solver
-linearsolver = BatchedGeneralizedMinimalResidual(b)
-# As well as an intial guess, denoted by the variable x
+linearsolver = BatchedGeneralizedMinimalResidual(b);
+# As well as an initial guess, denoted by the variable x
 x1 = ones(typeof(1.0), 3);
 x2 = ones(typeof(1.0), 3);
 x = [x1 x2];
 # To solve the linear system we just need to pass to the linearsolve! function
 iters = linearsolve!(linear_operator!, linearsolver, x, b)
-# Which is gauranteed to converge in 3 iterations since length(b1)=length(b2)=3
+# Which is guaranteed to converge in 3 iterations since `length(b1)=length(b2)=3`
 # We can now check that the solution that we computed, x
 display(x)
 # has converged to the exact solution
@@ -113,7 +113,7 @@ function closure_linear_operator!(A, tup)
             end
         end
     end
-end
+end;
 # Next we define the array structure of an MPIStateArray
 # in its true high dimensional form
 tup = (2, 2, 5, 2, 10, 2);
@@ -136,10 +136,10 @@ columnwise_linear_operator! = closure_linear_operator!(columnwise_A, tup);
 columnwise_inverse_linear_operator! =
     closure_linear_operator!(columnwise_inv_A, tup);
 # The structure of an MPIStateArray is related to its true
-# higher dimenionsal form as follows:
-mpi_tup = (tup[1] * tup[2] * tup[3], tup[4], tup[5] * tup[6])
+# higher dimensional form as follows:
+mpi_tup = (tup[1] * tup[2] * tup[3], tup[4], tup[5] * tup[6]);
 # We now define the right hand side of our Linear system
-b = randn(mpi_tup)
+b = randn(mpi_tup);
 # As well as the initial guess
 x = copy(b)
 x += randn(mpi_tup) * 0.1

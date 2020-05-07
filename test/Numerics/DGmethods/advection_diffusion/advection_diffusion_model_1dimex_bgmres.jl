@@ -1,21 +1,20 @@
 using MPI
-using CLIMA
+using ClimateMachine
 using Logging
 using Test
-using CLIMA.Mesh.Topologies
-using CLIMA.Mesh.Grids
-using CLIMA.DGmethods
-using CLIMA.DGmethods.NumericalFluxes
-using CLIMA.MPIStateArrays
-using CLIMA.LinearSolvers
-using CLIMA.GeneralizedMinimalResidualSolver
-using CLIMA.BatchedGeneralizedMinimalResidualSolver: BatchedGeneralizedMinimalResidual
-using CLIMA.ODESolvers
+using ClimateMachine.Mesh.Topologies
+using ClimateMachine.Mesh.Grids
+using ClimateMachine.DGmethods
+using ClimateMachine.DGmethods.NumericalFluxes
+using ClimateMachine.MPIStateArrays
+using ClimateMachine.BatchedGeneralizedMinimalResidualSolver: BatchedGeneralizedMinimalResidual
+using ClimateMachine.ODESolvers
 using LinearAlgebra
 using Printf
 using Dates
-using CLIMA.GenericCallbacks: EveryXWallTimeSeconds, EveryXSimulationSteps
-using CLIMA.VTK: writevtk, writepvtu
+using ClimateMachine.GenericCallbacks:
+    EveryXWallTimeSeconds, EveryXSimulationSteps
+using ClimateMachine.VTK: writevtk, writepvtu
 
 if !@isdefined integration_testing
     if length(ARGS) > 0
@@ -83,7 +82,7 @@ function do_output(mpicomm, vtkdir, vtkstep, dg, Q, Qe, model, testname)
         vtkstep
     )
 
-    statenames = flattenednames(vars_state(model, eltype(Q)))
+    statenames = flattenednames(vars_state_conservative(model, eltype(Q)))
     exactnames = statenames .* "_exact"
 
     writevtk(filename, Q, dg, statenames, Qe, exactnames)
@@ -121,6 +120,7 @@ function run(
     δ,
     vtkdir,
     outputtime,
+    linearsolvertype,
     fluxBC,
 )
 
@@ -134,8 +134,8 @@ function run(
     dg = DGModel(
         model,
         grid,
-        Rusanov(),
-        CentralNumericalFluxDiffusive(),
+        RusanovNumericalFlux(),
+        CentralNumericalFluxSecondOrder(),
         CentralNumericalFluxGradient(),
         direction = EveryDirection(),
     )
@@ -143,38 +143,21 @@ function run(
     vdg = DGModel(
         model,
         grid,
-        Rusanov(),
-        CentralNumericalFluxDiffusive(),
+        RusanovNumericalFlux(),
+        CentralNumericalFluxSecondOrder(),
         CentralNumericalFluxGradient(),
-        auxstate = dg.auxstate,
+        state_auxiliary = dg.state_auxiliary,
         direction = VerticalDirection(),
     )
 
+
     Q = init_ode_state(dg, FT(0))
 
-    # Setup columnwise GMRES solver (Batched GMRES)
-    topology = grid.topology
-    ngl = N + 1
-    num_states = size(Q)[2]
-    nelem = length(topology.elems)
-    nvertelem = topology.stacksize
-    nhorzelem = div(nelem, nvertelem)
-
-    reshaping_tup = (ngl, ngl, ngl, num_states, nvertelem, nhorzelem)
-    m = reshaping_tup[3] * reshaping_tup[5]
-    n = reshaping_tup[1] * reshaping_tup[2] * reshaping_tup[4] * reshaping_tup[6]
-
     linearsolver = BatchedGeneralizedMinimalResidual(
+        dg,
         Q;
-        ArrayType = ArrayType,
-        m = m,
-        n = n,
-        reshape_tuple_f = reshaping_tup,
-        # Permute such that the first two indices are associated with
-        # traversing a single column (3 and 5)
-        permute_tuple_f = (3,5,1,4,2,6),
-        atol = 1e-10,
-        rtol = 1e-10,
+        atol = sqrt(eps(FT)) * 0.01,
+        rtol = sqrt(eps(FT)) * 0.01,
     )
 
     ode_solver = ARK548L2SA2KennedyCarpenter(
@@ -278,8 +261,8 @@ function run(
 end
 
 let
-    CLIMA.init()
-    ArrayType = CLIMA.array_type()
+    ClimateMachine.init()
+    ArrayType = ClimateMachine.array_type()
 
     mpicomm = MPI.COMM_WORLD
 
@@ -310,7 +293,7 @@ let
     @testset "$(@__FILE__)" begin
         for FT in (Float64, Float32)
             result = zeros(FT, numlevels)
-            for dim in (3,)
+            for dim in 2:3
                 for fluxBC in (true, false)
                     d = dim == 2 ? FT[1, 10, 0] : FT[1, 1, 10]
                     n = SVector{3, FT}(d ./ norm(d))
@@ -319,6 +302,8 @@ let
                     β = FT(1 // 100)
                     μ = FT(-1 // 2)
                     δ = FT(1 // 10)
+
+                    linearsolvertype = "Batched GMRES"
                     for l in 1:numlevels
                         Ne = 2^(l - 1) * base_num_elem
                         brickrange = (
@@ -347,7 +332,6 @@ let
 
                         outputtime = 0.01
                         timeend = 0.5
-                        linearsolvertype = "BatchedGeneralizedMinimalResidual"
 
                         @info (
                             ArrayType,
@@ -359,9 +343,9 @@ let
                         )
                         vtkdir = output ?
                             "vtk_advection" *
-                            "_poly$(polynomialorder)" *
-                            "_dim$(dim)_$(ArrayType)_$(FT)" *
-                            "_$(linearsolvertype)_level$(l)" :
+                        "_poly$(polynomialorder)" *
+                        "_dim$(dim)_$(ArrayType)_$(FT)" *
+                        "_$(linearsolvertype)_level$(l)" :
                             nothing
                         result[l] = run(
                             mpicomm,
@@ -379,12 +363,13 @@ let
                             δ,
                             vtkdir,
                             outputtime,
+                            linearsolvertype,
                             fluxBC,
                         )
                         # test the errors significantly larger than floating point epsilon
                         if !(dim == 2 && l == 4 && FT == Float32)
                             @test result[l] ≈
-                                  FT(expected_result[dim, l, FT])
+                                    FT(expected_result[dim, l, FT])
                         end
                     end
                     @info begin

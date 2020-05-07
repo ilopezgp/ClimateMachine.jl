@@ -4,8 +4,10 @@ export BatchedGeneralizedMinimalResidual
 
 using ..LinearSolvers
 const LS = LinearSolvers
-using Adapt, KernelAbstractions, LinearAlgebra
-using CLIMA.MPIStateArrays
+using Adapt, CuArrays, KernelAbstractions, LinearAlgebra
+using ..MPIStateArrays
+using ..Mesh.Grids: dimensionality, polynomialorder
+using ..DGmethods: DGModel
 
 # struct
 """
@@ -106,7 +108,127 @@ function BatchedGeneralizedMinimalResidual(Qrhs; m = size(Qrhs)[1], n = size(Qrh
     return BatchedGeneralizedMinimalResidual(atol, rtol, m, n, k_n, residual, b, x, sol, rhs, cs, Q, H, R, reshape_tuple_f, permute_tuple_f, reshape_tuple_b, permute_tuple_b)
 end
 
-# TODO create seperate convenience constructor
+"""
+BatchedGeneralizedMinimalResidual(
+    dg::DGModel,
+    Q::MPIStateArray;
+    atol = sqrt(eps(eltype(Q))),
+    rtol = sqrt(eps(eltype(Q))),
+    max_subspace_size = nothing,
+    independent_states = false,
+)
+
+# Description
+Specialized constructor for BatchedGeneralizedMinimalResidual struct, using
+a `DGModel` to infer state-information and determine appropraite reshaping
+and permutations.
+
+# Arguments
+- `dg`: (DGModel) A `DGModel` containing all relevant grid and topology
+        information.
+- `Q` : (MPIStateArray) An `MPIStateArray` containing field information.
+
+# Keyword Arguments
+- `atol`: (float) absolute tolerance. DEFAULT = sqrt(eps(eltype(Q)))
+- `rtol`: (float) relative tolerance. DEFAULT = sqrt(eps(eltype(Q)))
+- `max_subspace_size` : (Int).    Maximal dimension of each (batched)
+                                  Krylov subspace. DEFAULT = nothing
+- `independent_states`: (boolean) An optional flag indicating whether
+                                  or not degrees of freedom are coupled
+                                  internally (within a column).
+                                  DEFAULT = false
+# Return
+instance of BatchedGeneralizedMinimalResidual struct
+"""
+function BatchedGeneralizedMinimalResidual(
+    dg::DGModel,
+    Q::MPIStateArray;
+    atol = sqrt(eps(eltype(Q))),
+    rtol = sqrt(eps(eltype(Q))),
+    max_subspace_size = nothing,
+    independent_states = false,
+)
+
+    # Need to determine array type for storage vectors
+    if isa(Q.data, Array)
+        ArrayType = Array
+    else
+        ArrayType = CuArray
+    end
+
+    grid = dg.grid
+    topology = grid.topology
+    dim = dimensionality(grid)
+
+    # Number of Gauss-Lobatto quadrature points in 1D
+    Nglp = polynomialorder(grid) + 1
+
+    # Assumes same number of quadrature points in all spatial directions
+    Nq = Tuple([Nglp for i = 1:dim])
+
+    # Number of states and elements (in vertical and horizontal directions)
+    num_states = size(Q)[2]
+    nelem = length(topology.elems)
+    nvertelem = topology.stacksize
+    nhorzelem = div(nelem, nvertelem)
+
+    # Definition of a "column" here is a vertical stack of degrees
+    # of freedom (linear element, 1 cells in a physical mesh column):
+    #    o----------o
+    #    |\ d1   d2 |\
+    #    | \        | \
+    #    |  \ d3    d4 \
+    #    |   o----------o
+    #    o--d5---d6-o   |
+    #     \  |       \  |
+    #      \ |        \ |
+    #       \|d7    d8 \|
+    #        o----------o
+    # with a total of Nglp ^ 2 * num_states * nvertelem
+    # degrees of freedom per physical mesh column
+    reshaping_tup = (Nq..., num_states, nvertelem, nhorzelem)
+
+    if independent_states
+        m = Nglp * nvertelem
+        n = (Nglp ^ (dim - 1)) * nhorzelem * num_states
+    else
+        m = Nglp * nvertelem * num_states
+        n = (Nglp ^ (dim - 1)) * nhorzelem
+    end
+
+    if max_subspace_size === nothing
+        max_subspace_size = m
+    end
+
+    # permute_tuple_f = (3, 5, 4, 2, 1, 6)
+    # Now we need to determine an appropriate permutation
+    # of the MPIStateArray to perform column-wise strides.
+    # Total size of the permute tuple
+    permute_size = length(reshaping_tup)
+
+    # Index associated with number of GL points
+    # in the 'vertical' direction
+    nql = length(Nq)
+    # Want: (index associated with GL pts in vertical direction, 
+    #        index associated with the stack size of the column,
+    #        index associated with number of states)
+    # FIXME: Better way to do this?
+    column_strides = (nql, nql + 2, nql - 1)
+    diff = Tuple(setdiff(Set([i for i=1:permute_size]), Set(column_strides)))
+    permute_tuple_f = (column_strides..., diff...)
+
+    return BatchedGeneralizedMinimalResidual(
+        Q;
+        m = m,
+        n = n,
+        subspace_size = max_subspace_size,
+        atol = atol,
+        rtol = rtol,
+        ArrayType = ArrayType,
+        reshape_tuple_f = reshaping_tup,
+        permute_tuple_f = permute_tuple_f,
+    )
+end
 
 # initialize function (1)
 function LS.initialize!(linearoperator!, Q, Qrhs, solver::BatchedGeneralizedMinimalResidual, args...)

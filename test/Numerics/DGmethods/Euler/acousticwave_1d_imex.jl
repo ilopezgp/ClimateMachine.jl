@@ -112,11 +112,16 @@ function run(
         meshwarp = cubedshellwarp,
     )
 
+    _R_d = FT(R_d(param_set))
+    _grav = FT(grav(param_set))
+    H_t = _R_d * setup.T_ref / _grav
+    T_profile = IsothermalProfile(setup.T_ref, H_t)
+
     model = AtmosModel{FT}(
         AtmosLESConfigType,
         param_set;
         orientation = SphericalOrientation(),
-        ref_state = HydrostaticState(IsothermalProfile(setup.T_ref), FT(0)),
+        ref_state = HydrostaticState(T_profile),
         turbulence = ConstantViscosityWithDivergence(FT(0)),
         moisture = DryModel(),
         source = Gravity(),

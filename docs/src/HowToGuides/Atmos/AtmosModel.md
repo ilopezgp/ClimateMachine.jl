@@ -1,4 +1,4 @@
-# [AtmosModel](@id AtmosModel-docs) 
+# [AtmosModel](@id AtmosModel-docs)
 
 This page provides a summary of a specific type of balance law within the ClimateMachine source code,
 the `AtmosModel`. This documentation aims to introduce a user to the properties of the
@@ -44,7 +44,7 @@ The conservation equations specific to this implementation of `AtmosModel` are i
 
 ### Tracer Species
 ```math
-\frac{(\partial \rho \chi_i)}{\partial t} + \nabla\cdot \left(\rho \chi_i \vec{u} \right) = \rho \mathcal{S}_{\chi_i} - \nabla\cdot (\rho \vec{d}_{\chi_i}) + \nabla\cdot (\rho \chi_{i} w_{\chi, i} \vec{\hat k})   
+\frac{(\partial \rho \chi_i)}{\partial t} + \nabla\cdot \left(\rho \chi_i \vec{u} \right) = \rho \mathcal{S}_{\chi_i} - \nabla\cdot (\rho \vec{d}_{\chi_i}) + \nabla\cdot (\rho \chi_{i} w_{\chi, i} \vec{\hat k})
 ```
 
 ## Equation Abstractions
@@ -148,19 +148,18 @@ implementation of the `AtmosModel` we concern ourselves with the conservative fo
 of moist fluid motion given a set of initial, boundary and forcing(source) conditions.
 
 ### [LES Configuration](@id LESConfig) (with defaults)
-Default field values for the LES `AtmosModel` definition are included below. Users are directed to the 
+Default field values for the LES `AtmosModel` definition are included below. Users are directed to the
 model subcomponent pages to view the possible options for each subcomponent.
 ```
     ::Type{AtmosLESConfigType},
     param_set::AbstractParameterSet;
     orientation::O = FlatOrientation(),
     ref_state::RS = HydrostaticState(
-        LinearTemperatureProfile(
-            FT(200),
-            FT(280),
-            FT(grav(param_set)) / FT(cp_d(param_set)),
+        DecayingTemperatureProfile(
+            param_set,
+            FT(290),
+            FT(60),
         ),
-        FT(0),
     ),
     turbulence::T = SmagorinskyLilly{FT}(0.21),
     hyperdiffusion::HD = NoHyperDiffusion(),
@@ -182,19 +181,18 @@ model subcomponent pages to view the possible options for each subcomponent.
 
 
 ### [GCM Configuration](@id GCMConfig)(with defaults)
-Default field values for the GCM `AtmosModel` definition are included below. Users are directed to the 
-model subcomponent pages to view the possible options for each subcomponent. 
+Default field values for the GCM `AtmosModel` definition are included below. Users are directed to the
+model subcomponent pages to view the possible options for each subcomponent.
 ```
     ::Type{AtmosGCMConfigType},
     param_set::AbstractParameterSet;
     orientation::O = SphericalOrientation(),
     ref_state::RS = HydrostaticState(
-        LinearTemperatureProfile(
-            FT(200),
-            FT(280),
-            FT(grav(param_set)) / FT(cp_d(param_set)),
+        DecayingTemperatureProfile(
+            param_set,
+            FT(290),
+            FT(60),
         ),
-        FT(0),
     ),
     turbulence::T = SmagorinskyLilly{FT}(C_smag(param_set)),
     hyperdiffusion::HD = NoHyperDiffusion(),

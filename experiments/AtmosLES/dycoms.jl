@@ -253,14 +253,14 @@ end
 
 function config_dycoms(FT, N, resolution, xmax, ymax, zmax)
     # Reference state
-    T_min = FT(289)
-    T_s = FT(290.4)
+    T_surface = FT(289)
     _grav = FT(grav(param_set))
     _cp_d = FT(cp_d(param_set))
-    Γ_lapse = _grav / _cp_d
-    T = LinearTemperatureProfile(T_min, T_s, Γ_lapse)
-    rel_hum = FT(0)
-    ref_state = HydrostaticState(T, rel_hum)
+    _R_d = FT(R_d(param_set))
+    ΔTv = FT(60)
+    H_t = _R_d * T_surface / _grav
+    T_profile = DecayingTemperatureProfile(T_surface, ΔTv, H_t)
+    ref_state = HydrostaticState(T_profile)
 
     # Radiation model
     κ = FT(85)

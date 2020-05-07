@@ -214,8 +214,8 @@ function config_risingbubble(FT, N, resolution, xmax, ymax, zmax)
     # The model coefficient for the turbulence closure is defined via the [CLIMAParameters
     # package](https://CliMA.github.io/CLIMAParameters.jl/latest/)
     # A reference state for the linearisation step is also defined.
-    ref_state =
-        HydrostaticState(DryAdiabaticProfile(typemin(FT), FT(300)), FT(0))
+    T_profile = DryAdiabaticProfile(FT(290))
+    ref_state = HydrostaticState(T_profile)
 
     # The fun part! Here we assemble the `AtmosModel`.
     #md # !!! note

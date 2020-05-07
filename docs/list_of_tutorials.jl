@@ -57,9 +57,11 @@ if generate_tutorials
         "Atmos" => Any["Dry Idealized GCM" => "generated/Atmos/heldsuarez.md",],
         "Ocean" => Any[],
         "Numerics" => Any[
-            "LinearSolvers" => Any["Conjugate Gradient" => "generated/Numerics/LinearSolvers/cg.md",],
-            "Contributing" => Any["Notes on Literate" => "generated/literate_markdown.md",],
+            "LinearSolvers" => Any[
+            "Conjugate Gradient" => "generated/Numerics/LinearSolvers/cg.md",],
+            "Batched Generalized Minimal Residual" => "generated/Numerics/LinearSolvers/bgmres.md",
         ],
+        "Contributing" => Any["Notes on Literate" => "generated/literate_markdown.md",],
     ]
 
 end

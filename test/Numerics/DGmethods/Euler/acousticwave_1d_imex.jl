@@ -112,10 +112,7 @@ function run(
         meshwarp = cubedshellwarp,
     )
 
-    _R_d = FT(R_d(param_set))
-    _grav = FT(grav(param_set))
-    H_t = _R_d * setup.T_ref / _grav
-    T_profile = IsothermalProfile(setup.T_ref, H_t)
+    T_profile = IsothermalProfile(setup.T_ref)
 
     model = AtmosModel{FT}(
         AtmosLESConfigType,

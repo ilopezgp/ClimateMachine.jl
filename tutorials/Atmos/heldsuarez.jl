@@ -154,10 +154,7 @@ nothing # hide
 # of the domain.
 T_surface = FT(290) ## surface temperature (K)
 ΔT = FT(60)  ## temperature drop between surface and top of atmosphere (K)
-_R_d = FT(R_d(param_set))
-_grav = FT(grav(param_set))
-H_t = _R_d * T_surface / _grav
-temp_profile_ref = DecayingTemperatureProfile(T_surface, ΔT, H_t)
+temp_profile_ref = DecayingTemperatureProfile(param_set, T_surface, ΔT)
 ref_state = HydrostaticState(temp_profile_ref)
 nothing # hide
 

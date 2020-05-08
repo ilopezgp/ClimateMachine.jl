@@ -46,10 +46,7 @@ function run1(mpicomm, ArrayType, dim, topl, N, timeend, FT, dt)
     )
 
     T_s = FT(290)
-    _R_d = FT(R_d(param_set))
-    _grav = FT(grav(param_set))
-    H_t = _R_d * T_s / _grav
-    T_profile = IsothermalProfile(T_s, H_t)
+    T_profile = IsothermalProfile(T_s)
     model = AtmosModel{FT}(
         AtmosLESConfigType,
         param_set;

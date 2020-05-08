@@ -97,13 +97,13 @@ end
 
 
 """
-    IsothermalProfile(T, H_t)
+    IsothermalProfile(param_set, T)
 
 A uniform temperature profile, which is implemented
 as a special case of [`DecayingTemperatureProfile`](@ref).
 """
-IsothermalProfile(T::FT, H_t::FT) where {FT <: AbstractFloat} =
-    DecayingTemperatureProfile(T, FT(0), profile.H_t)
+IsothermalProfile(param_set::AbstractParameterSet, T::FT) where {FT} =
+    DecayingTemperatureProfile{FT}(param_set, T, FT(0))
 
 """
     DryAdiabaticProfile{FT} <: TemperatureProfile{FT}
@@ -163,10 +163,10 @@ struct DecayingTemperatureProfile{FT} <: TemperatureProfile{FT}
     "Height scale over which virtual temperature drops (m)"
     H_t::FT
 end
-function DecayingTemperatureProfile(
+function DecayingTemperatureProfile{FT}(
     param_set::AbstractParameterSet,
-    T_virt_surf::FT,
-    ΔTv::FT,
+    T_virt_surf::FT=FT(290),
+    ΔTv::FT=FT(60),
 ) where {FT <: AbstractFloat}
     _R_d::FT = R_d(param_set)
     _grav::FT = grav(param_set)

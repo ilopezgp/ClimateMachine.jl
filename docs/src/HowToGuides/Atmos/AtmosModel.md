@@ -155,11 +155,7 @@ model subcomponent pages to view the possible options for each subcomponent.
     param_set::AbstractParameterSet;
     orientation::O = FlatOrientation(),
     ref_state::RS = HydrostaticState(
-        DecayingTemperatureProfile(
-            param_set,
-            FT(290),
-            FT(60),
-        ),
+        DecayingTemperatureProfile{FT}(param_set),
     ),
     turbulence::T = SmagorinskyLilly{FT}(0.21),
     hyperdiffusion::HD = NoHyperDiffusion(),
@@ -188,11 +184,7 @@ model subcomponent pages to view the possible options for each subcomponent.
     param_set::AbstractParameterSet;
     orientation::O = SphericalOrientation(),
     ref_state::RS = HydrostaticState(
-        DecayingTemperatureProfile(
-            param_set,
-            FT(290),
-            FT(60),
-        ),
+        DecayingTemperatureProfile{FT}(param_set),
     ),
     turbulence::T = SmagorinskyLilly{FT}(C_smag(param_set)),
     hyperdiffusion::HD = NoHyperDiffusion(),

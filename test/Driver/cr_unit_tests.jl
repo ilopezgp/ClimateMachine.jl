@@ -65,12 +65,9 @@ function main()
     timeend = FT(1800)
     # Timestep size (s)
     dt = FT(600)
-    _R_d = FT(R_d(param_set))
-    _grav = FT(grav(param_set))
-    H_t = _R_d * setup.T_ref / _grav
 
     setup = AcousticWaveSetup{FT}()
-    T_profile = IsothermalProfile(setup.T_ref, H_t)
+    T_profile = IsothermalProfile(setup.T_ref)
     orientation = SphericalOrientation()
     ref_state = HydrostaticState(T_profile)
     turbulence = ConstantViscosityWithDivergence(FT(0))

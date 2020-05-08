@@ -42,12 +42,7 @@ end
 
 function config_heldsuarez(FT, poly_order, resolution)
     # Set up a reference state for linearization of equations
-    T_sfc::FT = 290 # surface temperature of reference state (K)
-    ΔT::FT = 60     # temperature drop between surface and top of atmosphere (K)
-    _R_d = FT(R_d(param_set))
-    _grav = FT(grav(param_set))
-    H_t = _R_d * T_sfc / _grav
-    temp_profile_ref = DecayingTemperatureProfile(T_sfc, ΔT, H_t)
+    temp_profile_ref = DecayingTemperatureProfile{FT}(param_set)
     ref_state = HydrostaticState(temp_profile_ref)
 
     # Set up a Rayleigh sponge to dampen flow at the top of the domain

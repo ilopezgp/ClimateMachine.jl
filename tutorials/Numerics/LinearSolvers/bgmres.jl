@@ -16,7 +16,7 @@
 
 # ## Basic Example
 # First we must load a few things
-using CLIMA, CLIMA.LinearSolvers, CLIMA.BatchedGeneralizedMinimalResidualSolver
+using ClimateMachine, CLIMA.LinearSolvers, CLIMA.BatchedGeneralizedMinimalResidualSolver
 using LinearAlgebra, Random, Plots
 
 # Next we define two linear systems that we would like to solve simultaneously
@@ -95,7 +95,7 @@ display(x_exact)
 # !!! Warning
 #     Iterative methods should be used with Preconditioners!
 # The first thing we do is define a linear operator that mimics
-# the behavior of a columnwise operator in CLIMA
+# the behavior of a columnwise operator in ClimateMachine
 function closure_linear_operator!(A, tup)
     function linear_operator!(y, x)
         alias_x = reshape(x, tup)
@@ -165,7 +165,7 @@ ArrayType = Array;
 
 # We are now ready to finally define our linear solver, which uses a number
 # of keyword arguments
-mres = BatchedGeneralizedMinimalResidual(b, ArrayType = ArrayType, m = tup[3]*tup[5]*tup[4], n = tup[1]*tup[2]*tup[6], reshape_tuple_f = reshape_tuple_f, permute_tuple_f = permute_tuple_f, atol = eps(Float64)*10^2, rtol = eps(Float64)*10^2);
+gmres = BatchedGeneralizedMinimalResidual(b, ArrayType = ArrayType, m = tup[3]*tup[5]*tup[4], n = tup[1]*tup[2]*tup[6], reshape_tuple_f = reshape_tuple_f, permute_tuple_f = permute_tuple_f, atol = eps(Float64)*10^2, rtol = eps(Float64)*10^2);
 # ```m``` is the number of gridpoints along a column. As mentioned previously,
 # this is `tup[3]*tup[5]*tup[4]`. The ```n``` term corresponds to the batch size
 # or the number of columns in this case. ```atol``` and ```rtol``` are relative and
